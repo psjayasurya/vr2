@@ -53,7 +53,7 @@
 
             // 3. Load the texture (Replace URL with your own 360 image)
             // Note: Ensure your image allows CORS or is served locally.
-            const texture = new THREE.TextureLoader().load('https://upload.wikimedia.org/wikipedia/commons/f/f0/Colonia_Ulpia_Traiana_-_Hafentempel_-_Rekonstruktion_-_Innen_-_360_Degree.jpg'); 
+            const texture = new THREE.TextureLoader().load('img.jpg'); 
             
             const material = new THREE.MeshBasicMaterial({ map: texture });
             const mesh = new THREE.Mesh(geometry, material);
@@ -96,4 +96,5 @@
         }
     </script>
 </body>
+
 </html>
