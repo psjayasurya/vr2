@@ -3,55 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VR Tour with Gaze Hotspots</title>
+    <title>IIT Tirupati VR Tour</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
-        #loading {
-            position: absolute; top: 50%; left: 50%; 
-            transform: translate(-50%, -50%); 
-            color: white; font-size: 24px; pointer-events: none;
-            background: rgba(0,0,0,0.5); padding: 20px; border-radius: 10px;
-        }
-        #hotspot-info {
-            position: absolute; 
-            bottom: 20px; left: 50%; 
-            transform: translateX(-50%); 
-            color: white; 
-            font-size: 18px; 
-            padding: 10px 20px; 
-            background: rgba(49, 130, 206, 0.8); /* Tailwind blue-600 with transparency */
-            border-radius: 8px;
-            pointer-events: none; /* Crucial: ensures VR controls still work */
-            transition: opacity 0.3s, transform 0.3s;
-            opacity: 0;
-            z-index: 10;
-        }
-        #instructions {
-            position: absolute; 
-            top: 10px; right: 10px;
-            color: #ccc;
-            font-size: 14px;
-            background: rgba(0,0,0,0.4);
-            padding: 8px;
-            border-radius: 6px;
-            z-index: 10;
+        body { margin: 0; overflow: hidden; background-color: #000; }
+        #loader {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: white; font-family: sans-serif; font-size: 24px; pointer-events: none;
         }
     </style>
 </head>
 <body>
 
-    <div id="loading">Loading Experience...</div>
-    <div id="hotspot-info"></div>
-    <!-- New UI instruction for coordinate finding -->
-    <div id="instructions">
-        Hint: Look at a position and press **'P'** to log coordinates to console.
-    </div>
+    <div id="loader">Loading Tour...</div>
 
     <script type="importmap">
         {
             "imports": {
-                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
             }
         }
     </script>
@@ -59,64 +28,156 @@
     <script type="module">
         import * as THREE from 'three';
         import { VRButton } from 'three/addons/webxr/VRButton.js';
-        // Import OrbitControls for desktop mouse rotation
-        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-        // --- CONFIGURATION ---
-        // 1. Define your scenes
-        const SCENES = [
-            {
-                id: 0,
-                image: 'https://ggzftdlppjdrqugcrhgz.supabase.co/storage/v1/object/public/vr/images/Near%20Lift.jpg',
-                // Hotspots for this scene
+        // --- CONFIGURATION & DATA (From A-Frame Code) ---
+        const SCENES = {
+            "Near Lift": {
+                image: "https://ggzftdlppjdrqugcrhgz.supabase.co/storage/v1/object/public/vr/images/Near%20Lift.jpg",
+                hotspots: [{ label: "Entrance", pos: "-1.93098 0.86933 2.84814", target: "Entrance" }]
+            },
+            "Entrance": {
+                image: "https://ggzftdlppjdrqugcrhgz.supabase.co/storage/v1/object/public/vr/images/Entrance.jpg",
                 hotspots: [
-                    { lat: 0, lon: 0, targetScene: 1, text: "Go to Stonehenge" }, // Front
-                    { lat: 0, lon: 180, targetScene: 2, text: "Go to Sao Paulo" } // Behind
+                    { label: "Lift", pos: "-0.5265 0.607 3.49597", target: "Near Lift" },
+                    { label: "Cafeteria", pos: "6.9815 -0.1260 0.4922", target: "Cafeteria" }
+                ],
+                video: { src: "https://ggzftdlppjdrqugcrhgz.supabase.co/storage/v1/object/public/vr/images/iitintro.mp4", pos: [6.3881, 2.8031, 0.5790], rot: [0, -90, 0], width: 4, height: 1.7 }
+            },
+            "Cafeteria": {
+                image: "https://ggzftdlppjdrqugcrhgz.supabase.co/storage/v1/object/public/vr/images/Near%20Cafteria.jpg",
+                hotspots: [
+                    { label: "Entrance", pos: "6.8349 -0.0280 -1.5113", target: "Entrance" },
+                    { label: "CEO Room", pos: "-6.8273 -0.2380 1.5268", target: "CEO Room" }
                 ]
             },
-            {
-                id: 1,
-                image: 'https://ggzftdlppjdrqugcrhgz.supabase.co/storage/v1/object/public/vr/images/Entrance.jpg',
+            "CEO Room": {
+                image: "https://ggzftdlppjdrqugcrhgz.supabase.co/storage/v1/object/public/vr/images/CEO%20Room.jpg",
                 hotspots: [
-                    { lat: 0, lon: -90, targetScene: 0, text: "Back to Temple" } // Left
+                    { label: "Meeting Room", pos: "6.4692 -0.6988 -2.5810", target: "Meeting Room" },
+                    { label: "GNSS 3", pos: "4.6411 -0.9074 5.1610", target: "GNSS 3" },
+                    { label: "Comp Lab", pos: "0.6231 -1.1705 6.8733", target: "Computational Lab Outside" },
+                    { label: "Coffee", pos: "-0.9531 -1.8401 6.6862", target: "Near Coffee Machine" },
+                    { label: "Entrance", pos: "-0.1453 -0.5175 -6.9793", target: "Entrance" }
                 ]
             },
-            {
-                id: 2,
-                image: 'https://ggzftdlppjdrqugcrhgz.supabase.co/storage/v1/object/public/vr/images/Near%20Cafteria.jpg',
+            "Meeting Room": {
+                image: "https://ggzftdlppjdrqugcrhgz.supabase.co/storage/v1/object/public/vr/images/Meeting%20Room.jpg",
+                hotspots: [{ label: "CEO Room", pos: "-6.9123 -1.0599 0.3101", target: "CEO Room" }]
+            },
+            "GNSS 3": {
+                image: "https://ggzftdlppjdrqugcrhgz.supabase.co/storage/v1/object/public/vr/images/GNSS%203.jpg",
+                hotspots: [{ label: "CEO Room", pos: "1.1153 0.1260 6.9094", target: "CEO Room" }],
+                video: { src: "https://ggzftdlppjdrqugcrhgz.supabase.co/storage/v1/object/public/vr/images/gnssintro.mp4", pos: [-6.5050, 2.2815, 1.2162], rot: [0, 90, 0], width: 4, height: 1.7 }
+            },
+            "Computational Lab Outside": {
+                image: "https://ggzftdlppjdrqugcrhgz.supabase.co/storage/v1/object/public/vr/images/Computational%20Lab%20Outside.jpg",
                 hotspots: [
-                    // This is the hotspot you asked about, now with the descriptive text used.
-                    { lat: 10, lon: 45, targetScene: 0, text: "Return to the Roman Temple" }
+                    { label: "CEO Room", pos: "6.6084 -0.5594 2.2396", target: "CEO Room" },
+                    { label: "Coffee", pos: "6.9293 -0.9907 0.0607", target: "Near Coffee Machine" }
                 ]
+            },
+            "Near Coffee Machine": {
+                image: "https://ggzftdlppjdrqugcrhgz.supabase.co/storage/v1/object/public/vr/images/Near%20Coffee%20Machine.jpg",
+                hotspots: [
+                    { label: "Geo-Intel 1", pos: "6.3497 -0.0420 -2.9462", target: "geo-intel1" },
+                    { label: "CEO Room", pos: "2.2016 -0.1680 6.6427", target: "CEO Room" },
+                    { label: "Project Dir", pos: "2.8462 -0.0420 -6.3951", target: "Near Project Director Room" }
+                ]
+            },
+            "geo-intel1": {
+                image: "https://ggzftdlppjdrqugcrhgz.supabase.co/storage/v1/object/public/vr/images/geo-intel1.jpg",
+                hotspots: [{ label: "Coffee", pos: "-2.1070 -0.2659 6.6701", target: "Near Coffee Machine" }],
+                video: { src: "https://ggzftdlppjdrqugcrhgz.supabase.co/storage/v1/object/public/vr/images/geointel.mp4", pos: [-4.4145, 1.4592, 5.2328], rot: [0, 180, 0], width: 4, height: 1.7 }
+            },
+            "Near Project Director Room": {
+                image: "https://ggzftdlppjdrqugcrhgz.supabase.co/storage/v1/object/public/vr/images/Near%20Project%20Director%20Room.jpg",
+                hotspots: [
+                    { label: "Coffee", pos: "-6.8052 -1.3220 0.9704", target: "Near Coffee Machine" },
+                    { label: "Geo-Intel 2.1", pos: "5.7530 0.7406 3.9185", target: "geo-intel2.1" },
+                    { label: "Labs Outside", pos: "6.9248 0.0980 -1.0187", target: "Labs Outside" }
+                ]
+            },
+            "geo-intel2.1": {
+                image: "https://ggzftdlppjdrqugcrhgz.supabase.co/storage/v1/object/public/vr/images/geo-intel2.1.jpg",
+                hotspots: [
+                    { label: "Project Dir", pos: "6.1246 -0.1120 -3.3877", target: "Near Project Director Room" },
+                    { label: "Labs Outside", pos: "4.9411 -0.1960 4.9545", target: "Labs Outside" }
+                ]
+            },
+            "Labs Outside": {
+                image: "https://ggzftdlppjdrqugcrhgz.supabase.co/storage/v1/object/public/vr/images/Labs%20Outside.jpg",
+                hotspots: [
+                    { label: "Project Dir", pos: "-2.7104 0.0840 -6.4534", target: "Near Project Director Room" },
+                    { label: "Geo-Intel 2.1", pos: "-5.5260 0.9491 4.1907", target: "geo-intel2.1" },
+                    { label: "CV", pos: "6.8833 1.1290 -0.5882", target: "CV" },
+                    { label: "Advisory", pos: "2.6078 0.2659 6.4907", target: "Near Advisory Room" },
+                    { label: "GIS Lab", pos: "0.5170 0.3778 6.9706", target: "GIS Lab" }
+                ]
+            },
+            "CV": {
+                image: "https://ggzftdlppjdrqugcrhgz.supabase.co/storage/v1/object/public/vr/images/CV.jpg",
+                hotspots: [
+                    { label: "Advisory", pos: "2.3046 -0.1400 -6.6083", target: "Near Advisory Room" },
+                    { label: "Labs Outside", pos: "6.5167 -0.1960 2.5483", target: "Labs Outside" }
+                ]
+            },
+            "GIS Lab": {
+                image: "https://ggzftdlppjdrqugcrhgz.supabase.co/storage/v1/object/public/vr/images/GIS%20Lab.jpg",
+                hotspots: [
+                    { label: "Labs Outside", pos: "-6.1118 -0.4896 3.3773", target: "Labs Outside" },
+                    { label: "GYM Outside", pos: "-4.3179 -0.6013 -5.4767", target: "GYM Outside" }
+                ],
+                video: { src: "https://ggzftdlppjdrqugcrhgz.supabase.co/storage/v1/object/public/vr/images/video.mp4", pos: [6.9828, 0.4896, 0.0219], rot: [0, -90, 0], width: 3, height: 1.7 }
+            },
+            "Near Advisory Room": {
+                image: "https://ggzftdlppjdrqugcrhgz.supabase.co/storage/v1/object/public/vr/images/Near%20Advisory%20Room.jpg",
+                hotspots: [
+                    { label: "GIS Lab", pos: "2.94605 0.89913 3.40409", target: "GIS Lab" },
+                    { label: "GYM Outside", pos: "0.68107 0.29962 -7.04193", target: "GYM Outside" },
+                    { label: "Labs Outside", pos: "0.49767 0.59216 5.08032", target: "Labs Outside" }
+                ]
+            },
+            "GYM Outside": {
+                image: "https://ggzftdlppjdrqugcrhgz.supabase.co/storage/v1/object/public/vr/images/GYM%20Outside.jpg",
+                hotspots: [
+                    { label: "GIS Lab", pos: "-3.34097 0.29731 1.69082", target: "GIS Lab" },
+                    { label: "GYM", pos: "1.41115 0.85791 3.58189", target: "GYM " },
+                    { label: "Advisory", pos: "-3.14284 0.8528 -2.78872", target: "Near Advisory Room" }
+                ]
+            },
+            "GYM ": {
+                image: "https://ggzftdlppjdrqugcrhgz.supabase.co/storage/v1/object/public/vr/images/GYM.jpg",
+                hotspots: [{ label: "GYM Outside", pos: "-3.31339 0.51698 0.55613", target: "GYM Outside" }]
             }
-        ];
+        };
 
         // --- VARIABLES ---
         let camera, scene, renderer;
-        let controls; // Variable for OrbitControls
-        let sphereMesh, sphereMeshNext; // Two spheres for transition
-        let activeHotspots = []; // Stores current button meshes
-        let raycaster, reticle;
+        let sphereGroup;
+        let meshCurrent, meshNext; // The 360 Spheres
+        let hotspotGroup, videoGroup, uiGroup; // Groups for interaction
         
-        // UI element reference
-        const infoDiv = document.getElementById('hotspot-info');
+        let currentSceneId = "Near Lift"; // Starting Scene
         
-        // Gaze Logic variables
-        let intersectedObject = null;
-        let gazeStartTime = 0;
-        const GAZE_DELAY = 1500; // 1.5 Seconds to trigger
-        const GAZE_COLOR_IDLE = 0xffffff;
-        const GAZE_COLOR_HOVER = 0x00ff00;
-
-        // Transition variables
-        let currentSceneIndex = 0;
+        const FADE_DURATION = 1.5;
         let isTransitioning = false;
         let transitionTime = 0;
-        const FADE_DURATION = 1.5;
+
+        // Raycaster for interaction
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2(); // Mouse position
+        let intersectedObject = null;
+        
+        // Controllers
+        let controller1, controller2;
+        let controllerGrip1, controllerGrip2;
+
+        // Video State
+        let currentVideoMesh = null;
+        let currentVideoElement = null;
 
         init();
         animate();
-        setupCoordinateLogging();
 
         function init() {
             const container = document.createElement('div');
@@ -126,202 +187,346 @@
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             
+            // Create a camera group to hold the camera and the HUD
+            const cameraGroup = new THREE.Group();
+            cameraGroup.add(camera);
+            scene.add(cameraGroup);
+
             // 2. Renderer
-            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.xr.enabled = true;
+            renderer.outputColorSpace = THREE.SRGBColorSpace; 
             container.appendChild(renderer.domElement);
+
             document.body.appendChild(VRButton.createButton(renderer));
 
-            // 3. Desktop Controls (OrbitControls)
-            controls = new OrbitControls(camera, renderer.domElement);
-            // Disable moving or zooming, only allow rotation (360 view)
-            controls.enableZoom = false;
-            controls.enablePan = false;
-            controls.rotateSpeed = -0.5; // Invert to feel more like a mouse drag/swipe
-
-            // 4. The 360 Spheres (Double buffering for cross-fade)
+            // 3. Background Spheres (Cross-Fade Setup)
+            // Note: A-Frame has rotation="0 -90 0". In Three.js radians that is 0, -PI/2, 0.
             const geometry = new THREE.SphereGeometry(500, 60, 40);
             geometry.scale(-1, 1, 1); // Invert
+            geometry.rotateY(-Math.PI / 2); // Match A-Frame orientation
+
+            meshCurrent = new THREE.Mesh(geometry, createSphereMat());
+            meshNext = new THREE.Mesh(geometry, createSphereMat());
+            meshCurrent.renderOrder = 1;
+            meshNext.renderOrder = 0;
+
+            scene.add(meshCurrent);
+            scene.add(meshNext);
+
+            // 4. Interaction Groups
+            hotspotGroup = new THREE.Group();
+            scene.add(hotspotGroup);
+
+            videoGroup = new THREE.Group();
+            scene.add(videoGroup);
+
+            // 5. Setup Header (Attached to Camera)
+            setupHeader(camera);
+
+            // 6. Controllers & Input
+            setupControllers();
             
-            // Create two meshes for fading
-            sphereMesh = new THREE.Mesh(geometry, createMaterial(0));
-            sphereMeshNext = new THREE.Mesh(geometry, createMaterial(0));
-            sphereMesh.renderOrder = 1;
-            sphereMeshNext.renderOrder = 0; // Behind
-            
-            scene.add(sphereMesh);
-            scene.add(sphereMeshNext);
-
-            // 5. Reticle (The Cursor)
-            // We attach this to the CAMERA so it stays in center of vision
-            const reticleGeo = new THREE.RingGeometry(0.02, 0.04, 32);
-            const reticleMat = new THREE.MeshBasicMaterial({ 
-                color: GAZE_COLOR_IDLE, 
-                depthTest: false, // Always show on top
-                transparent: true
-            });
-            reticle = new THREE.Mesh(reticleGeo, reticleMat);
-            reticle.position.z = -1; // 1 meter in front of face
-            reticle.renderOrder = 999; // Draw last
-            camera.add(reticle);
-            scene.add(camera); // Important: Add camera to scene
-
-            // 6. Raycaster
-            raycaster = new THREE.Raycaster();
-
-            // 7. Initial Load
-            loadScene(0);
-
             window.addEventListener('resize', onWindowResize);
+            window.addEventListener('pointermove', onPointerMove);
+            window.addEventListener('click', onMouseClick);
+
+            // 7. Load Initial Scene
+            loadScene("Near Lift", true);
         }
 
-        function createMaterial(opacity) {
-            return new THREE.MeshBasicMaterial({
-                transparent: true,
-                opacity: opacity,
-                depthWrite: false, // Fix black screen issues
-                side: THREE.FrontSide // Standard rendering
+        function createSphereMat() {
+            return new THREE.MeshBasicMaterial({ 
+                transparent: true, 
+                opacity: 0, 
+                side: THREE.BackSide 
             });
         }
 
-        // --- COORDINATE LOGGING FUNCTION ---
-        function getGazeCoordinates() {
-            if (!camera) return { lat: 0, lon: 0 };
+        // --- UI & HEADER ---
+        function setupHeader(parentCamera) {
+            // Background Plane
+            const bgGeo = new THREE.PlaneGeometry(3, 0.25);
+            const bgMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.3 });
+            const bgMesh = new THREE.Mesh(bgGeo, bgMat);
+            bgMesh.position.set(0, 0.4, -1.5); // 1.5m in front of camera, slightly up
+            parentCamera.add(bgMesh);
 
-            const vector = new THREE.Vector3();
-            const spherical = new THREE.Spherical();
-            
-            // 1. Get the camera's forward direction vector (in world space)
-            camera.getWorldDirection(vector);
-            
-            // 2. Since the panorama sphere is inverted (geometry.scale(-1, 1, 1)), 
-            // the point we are looking at *inside* the sphere is in the opposite direction.
-            // We look along the vector multiplied by -1.
-            vector.multiplyScalar(-1);
-            
-            // 3. Convert the vector to standard spherical coordinates (r, phi, theta)
-            spherical.setFromVector3(vector);
-            
-            // 4. Convert to Hotspot Lat/Lon convention:
-            
-            // Latitude: 90 deg (up) - phi (where phi is 0 up, 180 down)
-            const lat = 90 - THREE.MathUtils.radToDeg(spherical.phi);
+            // Text Label (using CanvasTexture)
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024;
+            canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = "rgba(0,0,0,0)"; // Transparent
+            ctx.fillRect(0,0, 1024, 128);
+            ctx.fillStyle = "#00FFFF"; // Aqua
+            ctx.font = "bold 40px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText("IIT Tirupati Navavishkar Innovation Hub", 512, 80);
 
-            // Longitude: theta (normalized to [-180, 180])
-            let lon = THREE.MathUtils.radToDeg(spherical.theta);
+            const textTex = new THREE.CanvasTexture(canvas);
+            const textGeo = new THREE.PlaneGeometry(3, 0.375); // Aspect ratio
+            const textMat = new THREE.MeshBasicMaterial({ map: textTex, transparent: true });
+            const textMesh = new THREE.Mesh(textGeo, textMat);
+            textMesh.position.set(0, 0.4, -1.49); // Slightly in front of bg
+            parentCamera.add(textMesh);
 
-            // Normalize theta (lon) from [0, 360] to [-180, 180] if necessary
-            if (lon > 180) {
-                lon -= 360;
+            // Logo (Static Image)
+            const loader = new THREE.TextureLoader();
+            loader.load('https://ggzftdlppjdrqugcrhgz.supabase.co/storage/v1/object/public/vr/images/logo.jpg', (tex) => {
+                tex.colorSpace = THREE.SRGBColorSpace;
+                const logoGeo = new THREE.PlaneGeometry(0.2, 0.2);
+                const logoMat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+                const logoMesh = new THREE.Mesh(logoGeo, logoMat);
+                logoMesh.position.set(-0.9, 0.4, -1.48); // Left of text
+                parentCamera.add(logoMesh);
+            });
+        }
+
+        function setupControllers() {
+            // Standard WebXR controllers for raycasting
+            controller1 = renderer.xr.getController(0);
+            controller1.addEventListener('selectstart', onControllerSelect); // Trigger press
+            scene.add(controller1);
+
+            controller2 = renderer.xr.getController(1);
+            controller2.addEventListener('selectstart', onControllerSelect);
+            scene.add(controller2);
+
+            // Add visual lines to controllers
+            const geometry = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)]);
+            const line = new THREE.Line(geometry);
+            line.name = 'line';
+            line.scale.z = 5;
+            controller1.add(line.clone());
+            controller2.add(line.clone());
+        }
+
+        // --- SCENE LOADING ---
+        function loadScene(sceneId, initial = false) {
+            if (!SCENES[sceneId]) {
+                console.error("Scene not found:", sceneId);
+                return;
             }
 
-            return { lat: lat.toFixed(2), lon: lon.toFixed(2) };
-        }
-
-        // --- KEYBOARD LISTENER FOR LOGGING COORDINATES ---
-        function setupCoordinateLogging() {
-            document.addEventListener('keydown', (event) => {
-                // Check if 'P' key (case insensitive) is pressed
-                if (event.key.toUpperCase() === 'P') {
-                    if (camera) {
-                        const coords = getGazeCoordinates();
-                        console.log(`--- NEW HOTSPOT COORDINATES ---`);
-                        console.log(`Current Scene ID: ${SCENES[currentSceneIndex].id}`);
-                        console.log(`{ lat: ${coords.lat}, lon: ${coords.lon}, targetScene: [ID], text: "New Hotspot Name" }`);
-                        console.log(`-------------------------------`);
-                        
-                        // Optional: Flash the info box for immediate feedback
-                        updateInfo(`Coordinates logged to console: Lat ${coords.lat}, Lon ${coords.lon}`, true);
-                        setTimeout(() => updateInfo("", false), 2000);
-                        
-                    } else {
-                        console.error("Camera not initialized yet.");
-                    }
-                }
-            });
-        }
-        // --- CORE LOGIC: Positioning Hotspots ---
-        function loadScene(index) {
-            // Load Texture
+            const sceneData = SCENES[sceneId];
+            
+            // 1. Texture Management
+            const targetMesh = initial ? meshCurrent : meshNext;
+            
             const loader = new THREE.TextureLoader();
-            loader.load(SCENES[index].image, (texture) => {
+            loader.load(sceneData.image, (texture) => {
+                document.getElementById('loader').style.display = 'none';
+                texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
                 texture.colorSpace = THREE.SRGBColorSpace;
                 
-                // If this is the very first load
-                if (!sphereMesh.material.map) {
-                    sphereMesh.material.map = texture;
-                    sphereMesh.material.opacity = 1;
-                    sphereMesh.material.needsUpdate = true;
-                    document.getElementById('loading').style.display = 'none';
-                    createHotspotsForScene(index);
+                targetMesh.material.map = texture;
+                targetMesh.material.needsUpdate = true;
+
+                if (initial) {
+                    meshCurrent.material.opacity = 1;
+                    setupSceneContent(sceneId); // Immediately setup hotspots
                 } else {
-                    // It's a transition
-                    startTransition(texture, index);
+                    meshNext.material.opacity = 0;
+                    meshNext.visible = true;
+                    startTransition(sceneId);
                 }
             });
         }
 
-        function createHotspotsForScene(index) {
-            // 1. Clear old hotspots
-            activeHotspots.forEach(mesh => scene.remove(mesh));
-            activeHotspots = [];
-
-            // 2. Create new ones
-            const data = SCENES[index].hotspots;
-            if(!data) return;
-
-            data.forEach(hotspotData => {
-                // Create a simple circular button
-                const geo = new THREE.CircleGeometry(15, 32);
-                const mat = new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide });
-                const mesh = new THREE.Mesh(geo, mat);
-
-                // --- MAGIC MATH: Lat/Lon to 3D XYZ ---
-                // phi = 90 - lat (vertical)
-                // theta = lon (horizontal)
-                const lat = hotspotData.lat;
-                const lon = hotspotData.lon;
-                const radius = 450; // Slightly inside the 500 sphere
-
-                const phi = THREE.MathUtils.degToRad(90 - lat);
-                const theta = THREE.MathUtils.degToRad(lon);
-
-                mesh.position.setFromSphericalCoords(radius, phi, theta);
-                mesh.lookAt(0, 0, 0); // Face the user
-
-                // Attach data to mesh for Raycaster
-                mesh.userData = { 
-                    targetScene: hotspotData.targetScene,
-                    text: hotspotData.text // Store the description text
-                };
-                
-                scene.add(mesh);
-                activeHotspots.push(mesh);
-            });
-        }
-
-        function startTransition(newTexture, nextIndex) {
-            if (isTransitioning) return;
-
-            // Prepare "Next" sphere
-            sphereMeshNext.material.map = newTexture;
-            sphereMeshNext.material.opacity = 0;
-            sphereMeshNext.visible = true;
-            
-            // Hide hotspots and info during transition
-            activeHotspots.forEach(h => h.visible = false);
-            infoDiv.style.opacity = 0;
-
+        function startTransition(nextSceneId) {
+            if(isTransitioning) return;
             isTransitioning = true;
             transitionTime = 0;
             
-            // Callback to create new hotspots AFTER fade finishes
-            setTimeout(() => {
-                currentSceneIndex = nextIndex;
-                createHotspotsForScene(nextIndex);
-            }, FADE_DURATION * 1000);
+            // Temporarily hide interactive elements during fade
+            hotspotGroup.visible = false;
+            videoGroup.visible = false;
+
+            // Store next ID to load content after fade
+            meshNext.userData.sceneId = nextSceneId;
+        }
+
+        function setupSceneContent(sceneId) {
+            // Clear previous
+            while(hotspotGroup.children.length > 0){ 
+                hotspotGroup.remove(hotspotGroup.children[0]); 
+            }
+            while(videoGroup.children.length > 0){ 
+                videoGroup.remove(videoGroup.children[0]); 
+            }
+            
+            // Stop prev video
+            if(currentVideoElement) {
+                currentVideoElement.pause();
+                currentVideoElement = null;
+            }
+
+            const data = SCENES[sceneId];
+
+            // 1. Create Hotspots
+            if (data.hotspots) {
+                data.hotspots.forEach(h => {
+                    // Parse "x y z" string to numbers
+                    const coords = h.pos.split(' ').map(parseFloat);
+                    
+                    const sphereGeo = new THREE.SphereGeometry(0.3, 32, 32);
+                    const sphereMat = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.7 });
+                    const sphere = new THREE.Mesh(sphereGeo, sphereMat);
+                    sphere.position.set(coords[0], coords[1], coords[2]);
+                    
+                    // Metadata for interaction
+                    sphere.userData = { type: 'hotspot', target: h.target, label: h.label };
+                    
+                    hotspotGroup.add(sphere);
+
+                    // Add Text Label above hotspot
+                    addTextSprite(h.label, new THREE.Vector3(coords[0], coords[1] + 0.5, coords[2]));
+                });
+            }
+
+            // 2. Create Video Panel (if exists)
+            if (data.video) {
+                setupVideoPanel(data.video);
+            }
+
+            // Show groups again
+            hotspotGroup.visible = true;
+            videoGroup.visible = true;
+            currentSceneId = sceneId;
+        }
+
+        function addTextSprite(message, position) {
+            if(!message) return;
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 256; canvas.height = 128;
+            ctx.fillStyle = "rgba(0,0,0,0.5)";
+            ctx.fillRect(0,0,256,128);
+            ctx.fillStyle = "white";
+            ctx.font = "24px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText(message, 128, 70);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMat = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(spriteMat);
+            sprite.position.copy(position);
+            sprite.scale.set(1.5, 0.75, 1);
+            hotspotGroup.add(sprite);
+        }
+
+        function setupVideoPanel(vidData) {
+            // 1. HTML Video Element
+            const video = document.createElement('video');
+            video.src = vidData.src;
+            video.crossOrigin = "anonymous";
+            video.playsInline = true;
+            video.loop = false;
+            video.preload = "auto";
+            
+            currentVideoElement = video;
+
+            // 2. Texture
+            const videoTex = new THREE.VideoTexture(video);
+            videoTex.colorSpace = THREE.SRGBColorSpace;
+
+            // 3. Mesh
+            const planeGeo = new THREE.PlaneGeometry(vidData.width, vidData.height);
+            const planeMat = new THREE.MeshBasicMaterial({ map: videoTex, side: THREE.DoubleSide });
+            const mesh = new THREE.Mesh(planeGeo, planeMat);
+            
+            // Pos & Rot
+            mesh.position.set(vidData.pos[0], vidData.pos[1], vidData.pos[2]);
+            // Convert Degrees to Radians for Rotation
+            mesh.rotation.set(
+                vidData.rot[0] * Math.PI / 180, 
+                vidData.rot[1] * Math.PI / 180, 
+                vidData.rot[2] * Math.PI / 180
+            );
+
+            mesh.userData = { type: 'video', videoEl: video };
+            videoGroup.add(mesh);
+
+            // 4. Play Button Overlay
+            // Simple blue plane with text
+            const btnGeo = new THREE.PlaneGeometry(1.2, 0.4);
+            const btnCanvas = document.createElement('canvas');
+            btnCanvas.width = 256; btnCanvas.height = 64;
+            const ctx = btnCanvas.getContext('2d');
+            ctx.fillStyle = "#008CBA";
+            ctx.fillRect(0,0,256,64);
+            ctx.fillStyle = "white";
+            ctx.font = "bold 30px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText("▶ Play / Pause", 128, 42);
+            
+            const btnTex = new THREE.CanvasTexture(btnCanvas);
+            const btnMat = new THREE.MeshBasicMaterial({ map: btnTex });
+            const btnMesh = new THREE.Mesh(btnGeo, btnMat);
+            
+            // Offset button slightly in front of video
+            btnMesh.position.set(0, - (vidData.height/2) - 0.3, 0.1);
+            mesh.add(btnMesh); // Add to video mesh so it rotates with it
+            
+            btnMesh.userData = { type: 'playButton', parentVideo: video };
+        }
+
+        // --- INTERACTION ---
+
+        function onPointerMove(event) {
+            pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+            pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        }
+
+        function onMouseClick() {
+            if (isTransitioning) return;
+            raycaster.setFromCamera(pointer, camera);
+            handleRaycast(raycaster);
+        }
+
+        function onControllerSelect(event) {
+            if (isTransitioning) return;
+            const controller = event.target;
+            const tempMatrix = new THREE.Matrix4();
+            tempMatrix.identity().extractRotation(controller.matrixWorld);
+            raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+            raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+            handleRaycast(raycaster);
+        }
+
+        function handleRaycast(caster) {
+            // Check Hotspots
+            const hotHits = caster.intersectObjects(hotspotGroup.children);
+            if (hotHits.length > 0) {
+                const target = hotHits[0].object.userData.target;
+                if (target) loadScene(target);
+                return;
+            }
+
+            // Check Video Group (Buttons and Video Screens)
+            // We need to traverse children because buttons are children of video meshes
+            const vidHits = caster.intersectObjects(videoGroup.children, true);
+            if (vidHits.length > 0) {
+                const data = vidHits[0].object.userData;
+                
+                if (data.type === 'playButton') {
+                    toggleVideo(data.parentVideo);
+                } else if (data.type === 'video') {
+                    toggleVideo(data.videoEl);
+                }
+            }
+        }
+
+        function toggleVideo(videoEl) {
+            if (!videoEl) return;
+            if (videoEl.paused) {
+                videoEl.play();
+            } else {
+                videoEl.pause();
+            }
         }
 
         function onWindowResize() {
@@ -330,121 +535,40 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
+        // --- ANIMATION LOOP ---
         function animate() {
             renderer.setAnimationLoop(render);
         }
-        
-        // Function to update the 2D info box
-        function updateInfo(text, show) {
-            if (show && text) {
-                infoDiv.textContent = text;
-                infoDiv.style.opacity = 1;
-            } else {
-                infoDiv.style.opacity = 0;
-            }
-        }
 
         function render() {
-            const dt = 0.016;
+            // Update UI Hover state (Optional visual feedback could go here)
             
-            // Update OrbitControls for desktop rotation
-            if (controls) {
-                controls.update();
-            }
-
-            // --- 1. TRANSITION LOGIC ---
+            // Handle Transition
             if (isTransitioning) {
-                transitionTime += dt;
+                const delta = 0.016; 
+                transitionTime += delta;
                 let progress = transitionTime / FADE_DURATION;
-                if (progress > 1) progress = 1;
-
-                sphereMesh.material.opacity = 1 - progress;
-                sphereMeshNext.material.opacity = progress;
-
-                if (progress === 1) {
-                    isTransitioning = false;
-                    // Swap
-                    let temp = sphereMesh;
-                    sphereMesh = sphereMeshNext;
-                    sphereMeshNext = temp;
-                    sphereMesh.renderOrder = 1;
-                    sphereMeshNext.renderOrder = 0;
-                }
-            }
-
-            // --- 2. GAZE LOGIC ---
-            // Only update gaze if we aren't transitioning
-            if (!isTransitioning) {
-                // A. Cast Ray from Camera Center
-                // We only do gaze interaction (hotspot activation) if the user is not actively rotating the view (using OrbitControls)
-                // or if they are in an XR session.
-                const isInteracting = controls && controls.isDragging;
-                const isXRSession = renderer.xr.isPresenting;
                 
-                if (!isInteracting || isXRSession) {
-                    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-                    const intersects = raycaster.intersectObjects(activeHotspots);
+                if (progress >= 1) {
+                    progress = 1;
+                    isTransitioning = false;
+                    
+                    // Swap Logic
+                    const temp = meshCurrent;
+                    meshCurrent = meshNext;
+                    meshNext = temp;
+                    
+                    meshCurrent.material.opacity = 1;
+                    meshNext.material.opacity = 0;
+                    meshNext.visible = false;
 
-                    if (intersects.length > 0) {
-                        // HIT!
-                        const object = intersects[0].object;
-                        
-                        if (intersectedObject !== object) {
-                            // New Hover
-                            if (intersectedObject) {
-                                intersectedObject.scale.set(1, 1, 1);
-                            }
-                            intersectedObject = object;
-                            gazeStartTime = Date.now();
-                            reticle.material.color.setHex(GAZE_COLOR_HOVER);
-                            // Show info text immediately
-                            updateInfo(object.userData.text, true); 
-                            // Optional: Scale button up
-                            object.scale.set(1.2, 1.2, 1.2);
-                        } else {
-                            // Still Hovering - Check Timer
-                            const elapsed = Date.now() - gazeStartTime;
-                            
-                            // Animate Reticle (Scale down to indicate loading)
-                            const scale = 1 - (elapsed / GAZE_DELAY);
-                            reticle.scale.setScalar(scale > 0 ? scale : 0);
-
-                            if (elapsed >= GAZE_DELAY) {
-                                // TRIGGER!
-                                const target = object.userData.targetScene;
-                                console.log("Teleporting to scene", target);
-                                
-                                // Reset reticle and info
-                                reticle.scale.setScalar(1);
-                                reticle.material.color.setHex(GAZE_COLOR_IDLE);
-                                updateInfo("", false); // Hide info after trigger
-                                intersectedObject.scale.set(1, 1, 1);
-                                intersectedObject = null; // Prevent double trigger
-                                
-                                loadScene(target);
-                            }
-                        }
-
-                    } else {
-                        // NO HIT
-                        if (intersectedObject) {
-                            // Reset previous object scale and info
-                            intersectedObject.scale.set(1, 1, 1);
-                            updateInfo("", false); // Hide info
-                        }
-                        intersectedObject = null;
-                        reticle.material.color.setHex(GAZE_COLOR_IDLE);
-                        reticle.scale.setScalar(1);
-                    }
+                    // Setup content for the new scene
+                    setupSceneContent(meshCurrent.userData.sceneId);
                 } else {
-                     // If interacting with controls, suppress gaze interaction
-                    if (intersectedObject) {
-                        intersectedObject.scale.set(1, 1, 1);
-                    }
-                    intersectedObject = null;
-                    reticle.material.color.setHex(GAZE_COLOR_IDLE);
-                    reticle.scale.setScalar(1);
-                    updateInfo("", false);
+                    // Ease-in-out
+                    const ease = progress < .5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
+                    meshCurrent.material.opacity = 1 - ease;
+                    meshNext.material.opacity = ease;
                 }
             }
 
