@@ -59,6 +59,8 @@
     <script type="module">
         import * as THREE from 'three';
         import { VRButton } from 'three/addons/webxr/VRButton.js';
+        // Import OrbitControls for desktop mouse rotation
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
         // --- CONFIGURATION ---
         // 1. Define your scenes
@@ -91,6 +93,7 @@
 
         // --- VARIABLES ---
         let camera, scene, renderer;
+        let controls; // Variable for OrbitControls
         let sphereMesh, sphereMeshNext; // Two spheres for transition
         let activeHotspots = []; // Stores current button meshes
         let raycaster, reticle;
@@ -131,7 +134,14 @@
             container.appendChild(renderer.domElement);
             document.body.appendChild(VRButton.createButton(renderer));
 
-            // 3. The 360 Spheres (Double buffering for cross-fade)
+            // 3. Desktop Controls (OrbitControls)
+            controls = new OrbitControls(camera, renderer.domElement);
+            // Disable moving or zooming, only allow rotation (360 view)
+            controls.enableZoom = false;
+            controls.enablePan = false;
+            controls.rotateSpeed = -0.5; // Invert to feel more like a mouse drag/swipe
+
+            // 4. The 360 Spheres (Double buffering for cross-fade)
             const geometry = new THREE.SphereGeometry(500, 60, 40);
             geometry.scale(-1, 1, 1); // Invert
             
@@ -144,7 +154,7 @@
             scene.add(sphereMesh);
             scene.add(sphereMeshNext);
 
-            // 4. Reticle (The Cursor)
+            // 5. Reticle (The Cursor)
             // We attach this to the CAMERA so it stays in center of vision
             const reticleGeo = new THREE.RingGeometry(0.02, 0.04, 32);
             const reticleMat = new THREE.MeshBasicMaterial({ 
@@ -158,10 +168,10 @@
             camera.add(reticle);
             scene.add(camera); // Important: Add camera to scene
 
-            // 5. Raycaster
+            // 6. Raycaster
             raycaster = new THREE.Raycaster();
 
-            // 6. Initial Load
+            // 7. Initial Load
             loadScene(0);
 
             window.addEventListener('resize', onWindowResize);
@@ -336,6 +346,11 @@
 
         function render() {
             const dt = 0.016;
+            
+            // Update OrbitControls for desktop rotation
+            if (controls) {
+                controls.update();
+            }
 
             // --- 1. TRANSITION LOGIC ---
             if (isTransitioning) {
@@ -361,55 +376,75 @@
             // Only update gaze if we aren't transitioning
             if (!isTransitioning) {
                 // A. Cast Ray from Camera Center
-                raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-                const intersects = raycaster.intersectObjects(activeHotspots);
+                // We only do gaze interaction (hotspot activation) if the user is not actively rotating the view (using OrbitControls)
+                // or if they are in an XR session.
+                const isInteracting = controls && controls.isDragging;
+                const isXRSession = renderer.xr.isPresenting;
+                
+                if (!isInteracting || isXRSession) {
+                    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+                    const intersects = raycaster.intersectObjects(activeHotspots);
 
-                if (intersects.length > 0) {
-                    // HIT!
-                    const object = intersects[0].object;
-                    
-                    if (intersectedObject !== object) {
-                        // New Hover
-                        intersectedObject = object;
-                        gazeStartTime = Date.now();
-                        reticle.material.color.setHex(GAZE_COLOR_HOVER);
-                        // Show info text immediately
-                        updateInfo(object.userData.text, true); 
-                        // Optional: Scale button up
-                        object.scale.set(1.2, 1.2, 1.2);
-                    } else {
-                        // Still Hovering - Check Timer
-                        const elapsed = Date.now() - gazeStartTime;
+                    if (intersects.length > 0) {
+                        // HIT!
+                        const object = intersects[0].object;
                         
-                        // Animate Reticle (Scale down to indicate loading)
-                        const scale = 1 - (elapsed / GAZE_DELAY);
-                        reticle.scale.setScalar(scale > 0 ? scale : 0);
+                        if (intersectedObject !== object) {
+                            // New Hover
+                            if (intersectedObject) {
+                                intersectedObject.scale.set(1, 1, 1);
+                            }
+                            intersectedObject = object;
+                            gazeStartTime = Date.now();
+                            reticle.material.color.setHex(GAZE_COLOR_HOVER);
+                            // Show info text immediately
+                            updateInfo(object.userData.text, true); 
+                            // Optional: Scale button up
+                            object.scale.set(1.2, 1.2, 1.2);
+                        } else {
+                            // Still Hovering - Check Timer
+                            const elapsed = Date.now() - gazeStartTime;
+                            
+                            // Animate Reticle (Scale down to indicate loading)
+                            const scale = 1 - (elapsed / GAZE_DELAY);
+                            reticle.scale.setScalar(scale > 0 ? scale : 0);
 
-                        if (elapsed >= GAZE_DELAY) {
-                            // TRIGGER!
-                            const target = object.userData.targetScene;
-                            console.log("Teleporting to scene", target);
-                            
-                            // Reset reticle and info
-                            reticle.scale.setScalar(1);
-                            reticle.material.color.setHex(GAZE_COLOR_IDLE);
-                            updateInfo("", false); // Hide info after trigger
-                            intersectedObject = null; // Prevent double trigger
-                            
-                            loadScene(target);
+                            if (elapsed >= GAZE_DELAY) {
+                                // TRIGGER!
+                                const target = object.userData.targetScene;
+                                console.log("Teleporting to scene", target);
+                                
+                                // Reset reticle and info
+                                reticle.scale.setScalar(1);
+                                reticle.material.color.setHex(GAZE_COLOR_IDLE);
+                                updateInfo("", false); // Hide info after trigger
+                                intersectedObject.scale.set(1, 1, 1);
+                                intersectedObject = null; // Prevent double trigger
+                                
+                                loadScene(target);
+                            }
                         }
-                    }
 
+                    } else {
+                        // NO HIT
+                        if (intersectedObject) {
+                            // Reset previous object scale and info
+                            intersectedObject.scale.set(1, 1, 1);
+                            updateInfo("", false); // Hide info
+                        }
+                        intersectedObject = null;
+                        reticle.material.color.setHex(GAZE_COLOR_IDLE);
+                        reticle.scale.setScalar(1);
+                    }
                 } else {
-                    // NO HIT
+                     // If interacting with controls, suppress gaze interaction
                     if (intersectedObject) {
-                        // Reset previous object scale and info
                         intersectedObject.scale.set(1, 1, 1);
-                        updateInfo("", false); // Hide info
                     }
                     intersectedObject = null;
                     reticle.material.color.setHex(GAZE_COLOR_IDLE);
                     reticle.scale.setScalar(1);
+                    updateInfo("", false);
                 }
             }
 
